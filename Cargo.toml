@@ -1,0 +1,14 @@
+[package]
+name = "runevm"
+version = "0.1.0"
+authors = ["Alex Beregszaszi <alex@rtfs.hu>"]
+license = "Apache-2.0"
+repository = "https://github.com/axic/runevm"
+description = "EVM interpreter compatible with the evm2wasm interface"
+publish = false
+
+[dependencies]
+ewasm_api = { git = "https://github.com/ewasm/ewasm-rust-api" }
+
+[lib]
+crate-type = ["cdylib"]
