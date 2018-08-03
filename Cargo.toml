@@ -10,6 +10,9 @@ publish = false
 [dependencies]
 ewasm_api = { git = "https://github.com/ewasm/ewasm-rust-api" }
 evm = { path = "parity-ethereum/ethcore/evm" }
+vm = { path = "parity-ethereum/ethcore/vm" }
+ethereum-types = "0.3"
+parity-bytes = { git = "https://github.com/paritytech/parity-common" }
 
 [lib]
 crate-type = ["cdylib"]
