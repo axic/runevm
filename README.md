@@ -31,10 +31,10 @@ corresponding to the interpreter.
 
 ### Building
 
-Compile it with:
-```
-cargo build --release --target wasm32-unknown-unknown
-```
+Just run `build.sh`. The resulting binary will be at `target/runevm.wasm`.
+
+It expects `wasmg-gc` and `wast2wasm` from [wabt](https://github.com/webassembly/wabt)
+is installed and available in the path.
 
 ## Author(s)
 
