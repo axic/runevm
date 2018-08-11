@@ -25,6 +25,7 @@ use self::vm::{
 struct EwasmExt {
     pub info: EnvInfo,
     pub schedule: Schedule,
+    pub selfdestruct_address: Option<Address>
 }
 
 impl vm::Ext for EwasmExt {
@@ -137,8 +138,9 @@ impl vm::Ext for EwasmExt {
     /// Should be called when contract commits suicide.
     /// Address to which funds should be refunded.
     fn suicide(&mut self, refund_address: &Address) -> Result<()> {
-        // FIXME: implement
-        unimplemented!()
+        // NOTE: this will be handled after stopping execution with StopExecution
+        self.selfdestruct_address = Some(*refund_address);
+        Ok(())
     }
 
     /// Returns schedule.
@@ -205,7 +207,14 @@ pub extern fn main() {
     let result = instance.exec(params, &mut ext);
     // Could run `result.finalize(ext)` here, but processing manually seemed simpler.
     match result {
-        Ok(GasLeft::Known(gas_left)) => ewasm_api::finish(),
+        Ok(GasLeft::Known(gas_left)) => {
+            if ext.selfdestruct_address.is_some() {
+                let beneficiary = ext.selfdestruct_address.unwrap().to_vec();
+                ewasm_api::selfdestruct(beneficiary)
+            } else {
+                ewasm_api::finish()
+            }
+        },
         Ok(GasLeft::NeedsReturn {gas_left, data, apply_state}) => ewasm_api::finish_data(data.deref().to_vec()),
         // FIXME: add support for pushing the error message as revert data
         Err(err) => ewasm_api::revert()
