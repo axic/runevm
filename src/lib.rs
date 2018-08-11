@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::ops::Deref;
 use std::cmp;
 
-use self::ethereum_types::{U256, H256, H160, Address};
+use self::ethereum_types::{U128, U256, H256, H160, Address};
 
 use self::bytes::Bytes;
 
@@ -19,18 +19,6 @@ use self::vm::{
     ActionValue, Schedule, ContractCreateResult, MessageCallResult, CallType,
     Result, GasLeft
 };
-
-trait LEVec {
-    fn to_le_vec(&self) -> Vec<u8>;
-}
-
-impl LEVec for U256 {
-    fn to_le_vec(&self) -> Vec<u8> {
-        let mut ret = [0u8; 32];
-        self.to_little_endian(&mut ret);
-        ret.to_vec()
-    }
-}
 
 // For some explanation see ethcore/vm/src/tests.rs::FakeExt
 
@@ -44,13 +32,14 @@ struct EwasmExt {
 impl vm::Ext for EwasmExt {
     /// Returns a value for given key.
     fn storage_at(&self, key: &H256) -> Result<H256> {
-        let ret = ewasm_api::storage_load(&key.to_vec());
-        Ok(H256::from(ret.as_slice()))
+        // FIXME: why isn't there a From trait for converting between [u8;32] and H256?
+        let ret = ewasm_api::storage_load(&U256::from(key).into());
+        Ok(H256::from(ret))
     }
 
     /// Stores a value for given key.
     fn set_storage(&mut self, key: H256, value: H256) -> Result<()> {
-        ewasm_api::storage_store(&key.to_vec(), &value.to_vec());
+        ewasm_api::storage_store(&U256::from(key).into(), &U256::from(value).into());
         Ok(())
     }
 
@@ -72,12 +61,14 @@ impl vm::Ext for EwasmExt {
     fn origin_balance(&self) -> Result<U256> {
         // NOTE: used by SLEFDESTRUCT for gas metering (not used here now since we don't charge gas)
         let origin = ewasm_api::tx_origin();
-        Ok(U256::from(ewasm_api::external_balance(&origin).as_slice()))
+        Ok(U256::from(U128::from(ewasm_api::external_balance(&origin))))
     }
 
     /// Returns address balance.
     fn balance(&self, address: &Address) -> Result<U256> {
-        Ok(U256::from(ewasm_api::external_balance(&address.to_vec()).as_slice()))
+        // FIXME: this type should just implement the From trait for the underlying type
+        let address: [u8;20] = address.0;
+        Ok(U256::from(U128::from(ewasm_api::external_balance(&address))))
     }
 
     /// Returns the hash of one of the 256 most recent complete blocks.
@@ -117,11 +108,14 @@ impl vm::Ext for EwasmExt {
         // FIXME: might not be good enough
         let gas_start = ewasm_api::gas_left();
 
+        // FIXME: this type should just implement the From trait for the underlying type
+        let receive_address: [u8;20] = receive_address.0;
+
         let call_result = match call_type {
-            CallType::Call => ewasm_api::call_mutable(gas_limit, &receive_address.to_vec(), &value.unwrap_or_default().to_le_vec(), &data.to_vec()),
-            CallType::CallCode => ewasm_api::call_code(gas_limit, &receive_address.to_vec(), &value.unwrap_or_default().to_le_vec(), &data.to_vec()),
-            CallType::DelegateCall => ewasm_api::call_delegate(gas_limit, &receive_address.to_vec(), &data.to_vec()),
-            CallType::StaticCall => ewasm_api::call_static(gas_limit, &receive_address.to_vec(), &data.to_vec()),
+            CallType::Call => ewasm_api::call_mutable(gas_limit, &receive_address, &U128::from(value.unwrap_or_default()).into(), &data),
+            CallType::CallCode => ewasm_api::call_code(gas_limit, &receive_address, &U128::from(value.unwrap_or_default()).into(), &data),
+            CallType::DelegateCall => ewasm_api::call_delegate(gas_limit, &receive_address, &data),
+            CallType::StaticCall => ewasm_api::call_static(gas_limit, &receive_address, &data),
             _ => panic!()
         };
 
@@ -251,12 +245,12 @@ pub extern fn main() {
     let mut params = ActionParams::default();
     // FIXME: do we need to set this?
     // params.call_type = if code.is_none() { CallType::Call } else { CallType::None };
-    params.code_address = Address::from(ewasm_api::current_address().as_slice());
+    params.code_address = Address::from(ewasm_api::current_address());
     params.code = Some(Arc::new(ewasm_api::code_copy(0, ewasm_api::code_size())));
     params.address = params.code_address;
-    params.sender = Address::from(ewasm_api::caller().as_slice());
-    params.origin = Address::from(ewasm_api::tx_origin().as_slice());
-    params.gas_price = U256::from(ewasm_api::tx_gas_price().as_slice());
+    params.sender = Address::from(ewasm_api::caller());
+    params.origin = Address::from(ewasm_api::tx_origin());
+    params.gas_price = U256::from(U128::from(ewasm_api::tx_gas_price()));
     // NOTE: there is no tx_gas_limit in the EEI
     params.gas = U256::from(ewasm_api::gas_left());
     params.data = Some(ewasm_api::calldata_copy(0, ewasm_api::calldata_size()));
@@ -267,13 +261,13 @@ pub extern fn main() {
     match result {
         Ok(GasLeft::Known(gas_left)) => {
             if ext.selfdestruct_address.is_some() {
-                let beneficiary = ext.selfdestruct_address.unwrap().to_vec();
+                let beneficiary: [u8;20] = ext.selfdestruct_address.unwrap().into();
                 ewasm_api::selfdestruct(&beneficiary)
             } else {
                 ewasm_api::finish()
             }
         },
-        Ok(GasLeft::NeedsReturn {gas_left, data, apply_state}) => ewasm_api::finish_data(&data.deref().to_vec()),
+        Ok(GasLeft::NeedsReturn {gas_left, data, apply_state}) => ewasm_api::finish_data(&data.deref()),
         // FIXME: add support for pushing the error message as revert data
         Err(err) => ewasm_api::revert()
     }
