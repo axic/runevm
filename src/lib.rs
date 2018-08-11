@@ -57,8 +57,8 @@ impl vm::Ext for EwasmExt {
     /// Balance of the origin account.
     fn origin_balance(&self) -> Result<U256> {
         // NOTE: used by SLEFDESTRUCT for gas metering (not used here now since we don't charge gas)
-        // FIXME: implement
-        unimplemented!()
+        let origin = ewasm_api::tx_origin();
+        Ok(U256::from(ewasm_api::external_balance(origin).as_slice()))
     }
 
     /// Returns address balance.
