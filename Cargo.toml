@@ -8,7 +8,7 @@ description = "EVM interpreter compatible with the evm2wasm interface"
 publish = false
 
 [dependencies]
-ewasm_api = { git = "https://github.com/ewasm/ewasm-rust-api" }
+ewasm_api = { git = "https://github.com/ewasm/ewasm-rust-api", tag = "0.2.0" }
 evm = { path = "parity-ethereum/ethcore/evm" }
 vm = { path = "parity-ethereum/ethcore/vm" }
 ethereum-types = "0.3"

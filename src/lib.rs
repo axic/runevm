@@ -31,13 +31,13 @@ struct EwasmExt {
 impl vm::Ext for EwasmExt {
     /// Returns a value for given key.
     fn storage_at(&self, key: &H256) -> Result<H256> {
-        let ret = ewasm_api::storage_load(key.to_vec());
+        let ret = ewasm_api::storage_load(&key.to_vec());
         Ok(H256::from(ret.as_slice()))
     }
 
     /// Stores a value for given key.
     fn set_storage(&mut self, key: H256, value: H256) -> Result<()> {
-        ewasm_api::storage_store(key.to_vec(), value.to_vec());
+        ewasm_api::storage_store(&key.to_vec(), &value.to_vec());
         Ok(())
     }
 
@@ -59,12 +59,12 @@ impl vm::Ext for EwasmExt {
     fn origin_balance(&self) -> Result<U256> {
         // NOTE: used by SLEFDESTRUCT for gas metering (not used here now since we don't charge gas)
         let origin = ewasm_api::tx_origin();
-        Ok(U256::from(ewasm_api::external_balance(origin).as_slice()))
+        Ok(U256::from(ewasm_api::external_balance(&origin).as_slice()))
     }
 
     /// Returns address balance.
     fn balance(&self, address: &Address) -> Result<U256> {
-        Ok(U256::from(ewasm_api::external_balance(address.to_vec()).as_slice()))
+        Ok(U256::from(ewasm_api::external_balance(&address.to_vec()).as_slice()))
     }
 
     /// Returns the hash of one of the 256 most recent complete blocks.
@@ -210,12 +210,12 @@ pub extern fn main() {
         Ok(GasLeft::Known(gas_left)) => {
             if ext.selfdestruct_address.is_some() {
                 let beneficiary = ext.selfdestruct_address.unwrap().to_vec();
-                ewasm_api::selfdestruct(beneficiary)
+                ewasm_api::selfdestruct(&beneficiary)
             } else {
                 ewasm_api::finish()
             }
         },
-        Ok(GasLeft::NeedsReturn {gas_left, data, apply_state}) => ewasm_api::finish_data(data.deref().to_vec()),
+        Ok(GasLeft::NeedsReturn {gas_left, data, apply_state}) => ewasm_api::finish_data(&data.deref().to_vec()),
         // FIXME: add support for pushing the error message as revert data
         Err(err) => ewasm_api::revert()
     }
