@@ -150,8 +150,7 @@ impl vm::Ext for EwasmExt {
                 output.copy_from_slice(&ret[0..copy_len]);
 
                 MessageCallResult::Reverted(gas_used, ReturnData::new(ret, 0, ret_len))
-            },
-            _ => panic!()
+            }
         }
 
         // FIXME: no way to know if it ran out of gas? Handle it properly.
