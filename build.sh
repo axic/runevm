@@ -11,7 +11,7 @@ wasm-gc target/wasm32-unknown-unknown/release/runevm.wasm
 echo "Code size after stripping: $(stat -f%z target/wasm32-unknown-unknown/release/runevm.wasm)"
 
 # build deployer
-wat2wasm -o target/deployer.wasm src/deployer.wast
+./wat2wasm -o target/deployer.wasm src/deployer.wast
 
 # calculate size
 size=$(stat -f%z target/wasm32-unknown-unknown/release/runevm.wasm)

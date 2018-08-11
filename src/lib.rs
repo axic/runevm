@@ -6,6 +6,7 @@ extern crate parity_bytes as bytes;
 
 use std::sync::Arc;
 use std::ops::Deref;
+use std::cmp;
 
 use self::ethereum_types::{U256, H256, H160, Address};
 
@@ -18,6 +19,18 @@ use self::vm::{
     ActionValue, Schedule, ContractCreateResult, MessageCallResult, CallType,
     Result, GasLeft
 };
+
+trait LEVec {
+    fn to_le_vec(&self) -> Vec<u8>;
+}
+
+impl LEVec for U256 {
+    fn to_le_vec(&self) -> Vec<u8> {
+        let mut ret = [0u8; 32];
+        self.to_little_endian(&mut ret);
+        ret.to_vec()
+    }
+}
 
 // For some explanation see ethcore/vm/src/tests.rs::FakeExt
 
@@ -97,9 +110,54 @@ impl vm::Ext for EwasmExt {
 	output: &mut [u8],
 	call_type: CallType
     ) -> MessageCallResult {
-        // FIXME: implement
-        unimplemented!()
-        // MessageCallResult::Failed
+        // FIXME: set this properly
+        //let gas_limit = u64::from(gas);
+        let gas_limit = gas.as_u64();
+
+        // FIXME: might not be good enough
+        let gas_start = ewasm_api::gas_left();
+
+        let call_result = match call_type {
+            CallType::Call => ewasm_api::call_mutable(gas_limit, &receive_address.to_vec(), &value.unwrap_or_default().to_le_vec(), &data.to_vec()),
+            CallType::CallCode => ewasm_api::call_code(gas_limit, &receive_address.to_vec(), &value.unwrap_or_default().to_le_vec(), &data.to_vec()),
+            CallType::DelegateCall => ewasm_api::call_delegate(gas_limit, &receive_address.to_vec(), &data.to_vec()),
+            CallType::StaticCall => ewasm_api::call_static(gas_limit, &receive_address.to_vec(), &data.to_vec()),
+            _ => panic!()
+        };
+
+        // FIXME: might not be good enough
+        let gas_used = U256::from(ewasm_api::gas_left() - gas_start);
+
+        match call_result {
+            ewasm_api::CallResult::Successful => {
+                // Retrieve the entire returndata as it needs to be returned
+                let ret_len = ewasm_api::returndata_size();
+                let ret = ewasm_api::returndata_copy(0, ret_len);
+
+                // Copy from returndata into the requested output len
+                // The requested len may be smaller than available or returndata may be smaller than requested
+                let copy_len = cmp::min(output.len(), ret_len);
+                output.copy_from_slice(&ret[0..copy_len]);
+
+                MessageCallResult::Success(gas_used, ReturnData::new(ret, 0, ret_len))
+            },
+            ewasm_api::CallResult::Failure => MessageCallResult::Failed,
+            ewasm_api::CallResult::Revert => {
+                // Retrieve the entire returndata as it needs to be returned
+                let ret_len = ewasm_api::returndata_size();
+                let ret = ewasm_api::returndata_copy(0, ret_len);
+
+                // Copy from returndata into the requested output len
+                // The requested len may be smaller than available or returndata may be smaller than requested
+                let copy_len = cmp::min(output.len(), ret_len);
+                output.copy_from_slice(&ret[0..copy_len]);
+
+                MessageCallResult::Reverted(gas_used, ReturnData::new(ret, 0, ret_len))
+            },
+            _ => panic!()
+        }
+
+        // FIXME: no way to know if it ran out of gas? Handle it properly.
     }
 
     /// Returns code at given address
