@@ -33,13 +33,16 @@ impl vm::Ext for EwasmExt {
     /// Returns a value for given key.
     fn storage_at(&self, key: &H256) -> Result<H256> {
         // FIXME: why isn't there a From trait for converting between [u8;32] and H256?
-        let ret = ewasm_api::storage_load(&U256::from(key).into());
+        let key = key.0;
+        let ret = ewasm_api::storage_load(&key);
         Ok(H256::from(ret))
     }
 
     /// Stores a value for given key.
     fn set_storage(&mut self, key: H256, value: H256) -> Result<()> {
-        ewasm_api::storage_store(&U256::from(key).into(), &U256::from(value).into());
+        let key = key.0;
+        let value = value.0;
+        ewasm_api::storage_store(&key, &value);
         Ok(())
     }
 
