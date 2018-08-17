@@ -128,27 +128,27 @@ impl vm::Ext for EwasmExt {
         match call_result {
             ewasm_api::CallResult::Successful => {
                 // Retrieve the entire returndata as it needs to be returned
-                let ret_len = ewasm_api::returndata_size();
-                let ret = ewasm_api::returndata_copy(0, ret_len);
+                let ret = ewasm_api::returndata_acquire();
 
                 // Copy from returndata into the requested output len
                 // The requested len may be smaller than available or returndata may be smaller than requested
-                let copy_len = cmp::min(output.len(), ret_len);
+                let copy_len = cmp::min(output.len(), ret.len());
                 output.copy_from_slice(&ret[0..copy_len]);
 
+                let ret_len = ret.len();
                 MessageCallResult::Success(gas_used, ReturnData::new(ret, 0, ret_len))
             },
             ewasm_api::CallResult::Failure => MessageCallResult::Failed,
             ewasm_api::CallResult::Revert => {
                 // Retrieve the entire returndata as it needs to be returned
-                let ret_len = ewasm_api::returndata_size();
-                let ret = ewasm_api::returndata_copy(0, ret_len);
+                let ret = ewasm_api::returndata_acquire();
 
                 // Copy from returndata into the requested output len
                 // The requested len may be smaller than available or returndata may be smaller than requested
-                let copy_len = cmp::min(output.len(), ret_len);
+                let copy_len = cmp::min(output.len(), ret.len());
                 output.copy_from_slice(&ret[0..copy_len]);
 
+                let ret_len = ret.len();
                 MessageCallResult::Reverted(gas_used, ReturnData::new(ret, 0, ret_len))
             }
         }
@@ -248,14 +248,14 @@ pub extern fn main() {
     // FIXME: do we need to set this?
     // params.call_type = if code.is_none() { CallType::Call } else { CallType::None };
     params.code_address = Address::from(ewasm_api::current_address());
-    params.code = Some(Arc::new(ewasm_api::code_copy(0, ewasm_api::code_size())));
+    params.code = Some(Arc::new(ewasm_api::code_acquire()));
     params.address = params.code_address;
     params.sender = Address::from(ewasm_api::caller());
     params.origin = Address::from(ewasm_api::tx_origin());
     params.gas_price = U256::from(U128::from(ewasm_api::tx_gas_price()));
     // NOTE: there is no tx_gas_limit in the EEI
     params.gas = U256::from(ewasm_api::gas_left());
-    params.data = Some(ewasm_api::calldata_copy(0, ewasm_api::calldata_size()));
+    params.data = Some(ewasm_api::calldata_acquire());
 
     let mut ext = EwasmExt::default();
     let result = instance.exec(params, &mut ext);
