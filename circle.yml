@@ -9,7 +9,10 @@ jobs:
       - run:
           name: Update submodules
           command: |
+            # Need to remove the rewrite CircleCI add, because Parity has disabled ssh access for non-committers
+            git config --global --unset url."ssh://git@github.com".insteadOf "https://github.com"
             git submodule update --init
+            git config --global url."ssh://git@github.com".insteadOf "https://github.com" || true
       - run:
           name: Update rustc
           command: |
