@@ -1,0 +1,27 @@
+version: 2
+
+jobs:
+  build:
+    docker:
+      - image: rust:1
+    steps:
+      - checkout
+      - run:
+          name: Update submodules
+          command: |
+            # Need to remove the rewrite CircleCI add, because Parity has disabled ssh access for non-committers
+            git config --global --unset url."ssh://git@github.com".insteadOf "https://github.com"
+            git submodule update --init
+            git config --global url."ssh://git@github.com".insteadOf "https://github.com" || true
+      - run:
+          name: Update rustc
+          command: |
+            rustup target add wasm32-unknown-unknown
+            rustup update
+      - run:
+          name: Install dependencies
+          command: |
+            cargo install wasm-gc
+      - run:
+          name: Build
+          command: cargo build --release --target wasm32-unknown-unknown
