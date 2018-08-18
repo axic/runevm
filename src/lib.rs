@@ -1,23 +1,22 @@
-extern crate ewasm_api;
-extern crate vm;
-extern crate evm;
 extern crate ethereum_types;
+extern crate evm;
+extern crate ewasm_api;
 extern crate parity_bytes as bytes;
+extern crate vm;
 
-use std::sync::Arc;
-use std::ops::Deref;
 use std::cmp;
+use std::ops::Deref;
+use std::sync::Arc;
 
-use self::ethereum_types::{U128, U256, H256, H160, Address};
+use self::ethereum_types::{Address, H160, H256, U128, U256};
 
 use self::bytes::Bytes;
 
 use self::evm::Factory;
 
 use self::vm::{
-    EnvInfo, CreateContractAddress, ReturnData, CleanDustMode, ActionParams,
-    ActionValue, Schedule, ContractCreateResult, MessageCallResult, CallType,
-    Result, GasLeft
+    ActionParams, ActionValue, CallType, CleanDustMode, ContractCreateResult,
+    CreateContractAddress, EnvInfo, GasLeft, MessageCallResult, Result, ReturnData, Schedule,
 };
 
 // For some explanation see ethcore/vm/src/tests.rs::FakeExt
@@ -26,7 +25,7 @@ use self::vm::{
 struct EwasmExt {
     pub info: EnvInfo,
     pub schedule: Schedule,
-    pub selfdestruct_address: Option<Address>
+    pub selfdestruct_address: Option<Address>,
 }
 
 impl vm::Ext for EwasmExt {
@@ -70,8 +69,10 @@ impl vm::Ext for EwasmExt {
     /// Returns address balance.
     fn balance(&self, address: &Address) -> Result<U256> {
         // FIXME: this type should just implement the From trait for the underlying type
-        let address: [u8;20] = address.0;
-        Ok(U256::from(U128::from(ewasm_api::external_balance(&address))))
+        let address: [u8; 20] = address.0;
+        Ok(U256::from(U128::from(ewasm_api::external_balance(
+            &address,
+        ))))
     }
 
     /// Returns the hash of one of the 256 most recent complete blocks.
@@ -83,7 +84,13 @@ impl vm::Ext for EwasmExt {
     /// Creates new contract.
     ///
     /// Returns gas_left and contract address if contract creation was succesfull.
-    fn create(&mut self, gas: &U256, value: &U256, code: &[u8], address: CreateContractAddress) -> ContractCreateResult {
+    fn create(
+        &mut self,
+        gas: &U256,
+        value: &U256,
+        code: &[u8],
+        address: CreateContractAddress,
+    ) -> ContractCreateResult {
         // FIXME: implement
         unimplemented!()
         // ContractCreateResult::Failed
@@ -94,15 +101,16 @@ impl vm::Ext for EwasmExt {
     /// Returns Err, if we run out of gas.
     /// Otherwise returns call_result which contains gas left
     /// and true if subcall was successfull.
-    fn call(&mut self,
-	gas: &U256,
-	sender_address: &Address,
-	receive_address: &Address,
-	value: Option<U256>,
-	data: &[u8],
-	code_address: &Address,
-	output: &mut [u8],
-	call_type: CallType
+    fn call(
+        &mut self,
+        gas: &U256,
+        sender_address: &Address,
+        receive_address: &Address,
+        value: Option<U256>,
+        data: &[u8],
+        code_address: &Address,
+        output: &mut [u8],
+        call_type: CallType,
     ) -> MessageCallResult {
         // FIXME: set this properly
         //let gas_limit = u64::from(gas);
@@ -112,14 +120,24 @@ impl vm::Ext for EwasmExt {
         let gas_start = ewasm_api::gas_left();
 
         // FIXME: this type should just implement the From trait for the underlying type
-        let receive_address: [u8;20] = receive_address.0;
+        let receive_address: [u8; 20] = receive_address.0;
 
         let call_result = match call_type {
-            CallType::Call => ewasm_api::call_mutable(gas_limit, &receive_address, &U128::from(value.unwrap_or_default()).into(), &data),
-            CallType::CallCode => ewasm_api::call_code(gas_limit, &receive_address, &U128::from(value.unwrap_or_default()).into(), &data),
+            CallType::Call => ewasm_api::call_mutable(
+                gas_limit,
+                &receive_address,
+                &U128::from(value.unwrap_or_default()).into(),
+                &data,
+            ),
+            CallType::CallCode => ewasm_api::call_code(
+                gas_limit,
+                &receive_address,
+                &U128::from(value.unwrap_or_default()).into(),
+                &data,
+            ),
             CallType::DelegateCall => ewasm_api::call_delegate(gas_limit, &receive_address, &data),
             CallType::StaticCall => ewasm_api::call_static(gas_limit, &receive_address, &data),
-            _ => panic!()
+            _ => panic!(),
         };
 
         // FIXME: might not be good enough
@@ -137,7 +155,7 @@ impl vm::Ext for EwasmExt {
 
                 let ret_len = ret.len();
                 MessageCallResult::Success(gas_used, ReturnData::new(ret, 0, ret_len))
-            },
+            }
             ewasm_api::CallResult::Failure => MessageCallResult::Failed,
             ewasm_api::CallResult::Revert => {
                 // Retrieve the entire returndata as it needs to be returned
@@ -223,13 +241,22 @@ impl vm::Ext for EwasmExt {
     }
 
     /// Decide if any more operations should be traced. Passthrough for the VM trace.
-    fn trace_next_instruction(&mut self, _pc: usize, _instruction: u8, _current_gas: U256) -> bool { false }
+    fn trace_next_instruction(&mut self, _pc: usize, _instruction: u8, _current_gas: U256) -> bool {
+        false
+    }
 
     /// Prepare to trace an operation. Passthrough for the VM trace.
     fn trace_prepare_execute(&mut self, _pc: usize, _instruction: u8, _gas_cost: U256) {}
 
     /// Trace the finalised execution of a single instruction.
-    fn trace_executed(&mut self, _gas_used: U256, _stack_push: &[U256], _mem_diff: Option<(usize, &[u8])>, _store_diff: Option<(U256, U256)>) {}
+    fn trace_executed(
+        &mut self,
+        _gas_used: U256,
+        _stack_push: &[U256],
+        _mem_diff: Option<(usize, &[u8])>,
+        _store_diff: Option<(U256, U256)>,
+    ) {
+    }
 
     /// Check if running in static context.
     fn is_static(&self) -> bool {
@@ -239,7 +266,7 @@ impl vm::Ext for EwasmExt {
 }
 
 #[no_mangle]
-pub extern fn main() {
+pub extern "C" fn main() {
     // It is fine using U256::zero() here because the main point of the
     // factory is to determine if gas is 64bit or not. In ewasm it is always 64bit.
     let mut instance = Factory::default().create(&U256::zero());
@@ -263,14 +290,18 @@ pub extern fn main() {
     match result {
         Ok(GasLeft::Known(gas_left)) => {
             if ext.selfdestruct_address.is_some() {
-                let beneficiary: [u8;20] = ext.selfdestruct_address.unwrap().into();
+                let beneficiary: [u8; 20] = ext.selfdestruct_address.unwrap().into();
                 ewasm_api::selfdestruct(&beneficiary)
             } else {
                 ewasm_api::finish()
             }
-        },
-        Ok(GasLeft::NeedsReturn {gas_left, data, apply_state}) => ewasm_api::finish_data(&data.deref()),
+        }
+        Ok(GasLeft::NeedsReturn {
+            gas_left,
+            data,
+            apply_state,
+        }) => ewasm_api::finish_data(&data.deref()),
         // FIXME: add support for pushing the error message as revert data
-        Err(err) => ewasm_api::revert()
+        Err(err) => ewasm_api::revert(),
     }
 }
