@@ -334,8 +334,14 @@ pub extern "C" fn main() {
             }
         }
         // FIXME: not sure what this state means
-        Ok(Err(err)) => ewasm_api::revert(),
+        Ok(Err(err)) => {
+            // panic will trigger an unreachable instruction which in turn is a regular failure
+            panic!()
+        }
         // FIXME: add support for pushing the error message as revert data
-        Err(err) => ewasm_api::revert(),
+        Err(err) => {
+            // panic will trigger an unreachable instruction which in turn is a regular failure
+            panic!()
+        }
     }
 }
