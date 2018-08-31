@@ -296,6 +296,9 @@ pub extern "C" fn main() {
 
     let mut ext = EwasmExt::default();
 
+    // TODO: should create a proper implementation for default() on EwasmExt which does this
+    ext.schedule = Schedule::new_byzantium();
+
     // Set block environment information
     // TODO: do this via lazy loading
     ext.info.author = Address::from(ewasm_api::block_coinbase());
@@ -306,6 +309,7 @@ pub extern "C" fn main() {
 
     let mut instance = Factory::default().create(params, ext.schedule(), ext.depth());
     let result = instance.exec(&mut ext);
+
     // Could run `result.finalize(ext)` here, but processing manually seemed simpler.
     match result {
         Ok(Ok(GasLeft::Known(gas_left))) => {
