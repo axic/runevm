@@ -13,7 +13,7 @@ ewasm_api = { git = "https://github.com/ewasm/ewasm-rust-api", tag = "0.4.0" }
 evm = { path = "parity-ethereum/ethcore/evm" }
 vm = { path = "parity-ethereum/ethcore/vm" }
 ethereum-types = "0.3"
-parity-bytes = { git = "https://github.com/paritytech/parity-common" }
+parity-bytes = { git = "https://github.com/paritytech/parity-common", rev = "b7e6dd3e48c6ce77" }
 
 [lib]
 crate-type = ["cdylib"]
