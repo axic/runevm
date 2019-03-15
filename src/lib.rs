@@ -290,6 +290,7 @@ pub extern "C" fn main() {
     params.sender = Address::from(ewasm_api::caller());
     params.origin = Address::from(ewasm_api::tx_origin());
     params.gas_price = U256::from(U128::from(ewasm_api::tx_gas_price()));
+    // NOTE: there is no tx_gas_limit in the EEI
     params.gas = U256::from(startgas);
     params.data = Some(ewasm_api::calldata_acquire());
 
@@ -308,6 +309,7 @@ pub extern "C" fn main() {
     // Could run `result.finalize(ext)` here, but processing manually seemed simpler.
     match result {
         Ok(Ok(GasLeft::Known(gas_left))) => {
+            ewasm_api::consume_gas(startgas - gas_left.as_u64());
             if ext.selfdestruct_address.is_some() {
                 let beneficiary: [u8; 20] = ext.selfdestruct_address.unwrap().into();
                 ewasm_api::selfdestruct(&beneficiary)
@@ -319,7 +321,10 @@ pub extern "C" fn main() {
             gas_left,
             data,
             apply_state,
-        })) => ewasm_api::finish_data(&data.deref()),
+        })) => {
+            ewasm_api::consume_gas(startgas - gas_left.as_u64());
+            ewasm_api::finish_data(&data.deref())
+        }
         // FIXME: not sure what this state means
         Ok(Err(err)) => ewasm_api::revert(),
         // FIXME: add support for pushing the error message as revert data
