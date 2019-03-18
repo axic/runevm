@@ -295,6 +295,14 @@ pub extern "C" fn main() {
 
     let mut ext = EwasmExt::default();
 
+    // Set block environment information
+    // TODO: do this via lazy loading
+    ext.info.author = Address::from(ewasm_api::block_coinbase());
+    ext.info.difficulty = U256::from(ewasm_api::block_difficulty());
+    ext.info.number = ewasm_api::block_number();
+    ext.info.timestamp = ewasm_api::block_timestamp();
+    ext.info.gas_limit = U256::from(ewasm_api::block_gas_limit());
+
     let mut instance = Factory::default().create(params, ext.schedule(), ext.depth());
     let result = instance.exec(&mut ext);
     // Could run `result.finalize(ext)` here, but processing manually seemed simpler.
