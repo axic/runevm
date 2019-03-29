@@ -1,0 +1,9 @@
+runevm:
+  file: "target/wasm32-unknown-unknown/release/runevm.wasm"
+  output: "target/runevm.wasm"
+  remapimports:
+    preset: "ewasm"
+  trimexports:
+    preset: "ewasm"
+  deployer:
+    preset: "customsection"
