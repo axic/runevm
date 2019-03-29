@@ -12,11 +12,13 @@ use self::ethereum_types::{Address, H160, H256, U128, U256};
 
 use self::bytes::Bytes;
 
+use self::evm::Ext;
 use self::evm::Factory;
 
 use self::vm::{
     ActionParams, ActionValue, CallType, CleanDustMode, ContractCreateResult,
     CreateContractAddress, EnvInfo, GasLeft, MessageCallResult, Result, ReturnData, Schedule,
+    TrapKind,
 };
 
 // For some explanation see ethcore/vm/src/tests.rs::FakeExt
@@ -29,6 +31,11 @@ struct EwasmExt {
 }
 
 impl vm::Ext for EwasmExt {
+    /// Returns the storage value for a given key if reversion happens on the current transaction.
+    fn initial_storage_at(&self, key: &H256) -> Result<H256> {
+        unimplemented!()
+    }
+
     /// Returns a value for given key.
     fn storage_at(&self, key: &H256) -> Result<H256> {
         // FIXME: why isn't there a From trait for converting between [u8;32] and H256?
@@ -90,7 +97,8 @@ impl vm::Ext for EwasmExt {
         value: &U256,
         code: &[u8],
         address: CreateContractAddress,
-    ) -> ContractCreateResult {
+        trap: bool,
+    ) -> ::std::result::Result<ContractCreateResult, TrapKind> {
         // FIXME: implement
         unimplemented!()
         // ContractCreateResult::Failed
@@ -109,9 +117,9 @@ impl vm::Ext for EwasmExt {
         value: Option<U256>,
         data: &[u8],
         code_address: &Address,
-        output: &mut [u8],
         call_type: CallType,
-    ) -> MessageCallResult {
+        trap: bool,
+    ) -> ::std::result::Result<MessageCallResult, TrapKind> {
         // FIXME: set this properly
         //let gas_limit = u64::from(gas);
         let gas_limit = gas.as_u64();
@@ -148,26 +156,22 @@ impl vm::Ext for EwasmExt {
                 // Retrieve the entire returndata as it needs to be returned
                 let ret = ewasm_api::returndata_acquire();
 
-                // Copy from returndata into the requested output len
-                // The requested len may be smaller than available or returndata may be smaller than requested
-                let copy_len = cmp::min(output.len(), ret.len());
-                output.copy_from_slice(&ret[0..copy_len]);
-
                 let ret_len = ret.len();
-                MessageCallResult::Success(gas_used, ReturnData::new(ret, 0, ret_len))
+                Ok(MessageCallResult::Success(
+                    gas_used,
+                    ReturnData::new(ret, 0, ret_len),
+                ))
             }
-            ewasm_api::CallResult::Failure => MessageCallResult::Failed,
+            ewasm_api::CallResult::Failure => Ok(MessageCallResult::Failed),
             ewasm_api::CallResult::Revert => {
                 // Retrieve the entire returndata as it needs to be returned
                 let ret = ewasm_api::returndata_acquire();
 
-                // Copy from returndata into the requested output len
-                // The requested len may be smaller than available or returndata may be smaller than requested
-                let copy_len = cmp::min(output.len(), ret.len());
-                output.copy_from_slice(&ret[0..copy_len]);
-
                 let ret_len = ret.len();
-                MessageCallResult::Reverted(gas_used, ReturnData::new(ret, 0, ret_len))
+                Ok(MessageCallResult::Reverted(
+                    gas_used,
+                    ReturnData::new(ret, 0, ret_len),
+                ))
             }
         }
 
@@ -234,10 +238,14 @@ impl vm::Ext for EwasmExt {
         0
     }
 
-    /// Increments sstore refunds count by 1.
-    fn inc_sstore_clears(&mut self) {
-        // NOTE: used for gas refund on SSTORE deletion (non-zero to zero)
-        // FIXME: implement
+    /// Increments sstore refunds counter.
+    fn add_sstore_refund(&mut self, value: usize) {
+        unimplemented!()
+    }
+
+    /// Decrements sstore refunds counter.
+    fn sub_sstore_refund(&mut self, value: usize) {
+        unimplemented!()
     }
 
     /// Decide if any more operations should be traced. Passthrough for the VM trace.
@@ -246,17 +254,18 @@ impl vm::Ext for EwasmExt {
     }
 
     /// Prepare to trace an operation. Passthrough for the VM trace.
-    fn trace_prepare_execute(&mut self, _pc: usize, _instruction: u8, _gas_cost: U256) {}
-
-    /// Trace the finalised execution of a single instruction.
-    fn trace_executed(
+    fn trace_prepare_execute(
         &mut self,
-        _gas_used: U256,
-        _stack_push: &[U256],
-        _mem_diff: Option<(usize, &[u8])>,
-        _store_diff: Option<(U256, U256)>,
+        _pc: usize,
+        _instruction: u8,
+        _gas_cost: U256,
+        _mem_written: Option<(usize, usize)>,
+        _store_written: Option<(U256, U256)>,
     ) {
     }
+
+    /// Trace the finalised execution of a single instruction.
+    fn trace_executed(&mut self, _gas_used: U256, _stack_push: &[U256], _mem: &[u8]) {}
 
     /// Check if running in static context.
     fn is_static(&self) -> bool {
@@ -267,11 +276,8 @@ impl vm::Ext for EwasmExt {
 
 #[no_mangle]
 pub extern "C" fn main() {
-    // It is fine using U256::zero() here because the main point of the
-    // factory is to determine if gas is 64bit or not. In ewasm it is always 64bit.
-    let mut instance = Factory::default().create(&U256::zero());
-
     let mut params = ActionParams::default();
+
     // FIXME: do we need to set this?
     // params.call_type = if code.is_none() { CallType::Call } else { CallType::None };
     params.code_address = Address::from(ewasm_api::current_address());
@@ -285,10 +291,12 @@ pub extern "C" fn main() {
     params.data = Some(ewasm_api::calldata_acquire());
 
     let mut ext = EwasmExt::default();
-    let result = instance.exec(params, &mut ext);
+
+    let mut instance = Factory::default().create(params, ext.schedule(), ext.depth());
+    let result = instance.exec(&mut ext);
     // Could run `result.finalize(ext)` here, but processing manually seemed simpler.
     match result {
-        Ok(GasLeft::Known(gas_left)) => {
+        Ok(Ok(GasLeft::Known(gas_left))) => {
             if ext.selfdestruct_address.is_some() {
                 let beneficiary: [u8; 20] = ext.selfdestruct_address.unwrap().into();
                 ewasm_api::selfdestruct(&beneficiary)
@@ -296,11 +304,13 @@ pub extern "C" fn main() {
                 ewasm_api::finish()
             }
         }
-        Ok(GasLeft::NeedsReturn {
+        Ok(Ok(GasLeft::NeedsReturn {
             gas_left,
             data,
             apply_state,
-        }) => ewasm_api::finish_data(&data.deref()),
+        })) => ewasm_api::finish_data(&data.deref()),
+        // FIXME: not sure what this state means
+        Ok(Err(err)) => ewasm_api::revert(),
         // FIXME: add support for pushing the error message as revert data
         Err(err) => ewasm_api::revert(),
     }
