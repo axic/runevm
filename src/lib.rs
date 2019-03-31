@@ -327,11 +327,21 @@ pub extern "C" fn main() {
             apply_state,
         })) => {
             ewasm_api::consume_gas(startgas - gas_left.as_u64());
-            ewasm_api::finish_data(&data.deref())
+            if apply_state {
+                ewasm_api::finish_data(&data.deref())
+            } else {
+                ewasm_api::revert_data(&data.deref())
+            }
         }
         // FIXME: not sure what this state means
-        Ok(Err(err)) => ewasm_api::revert(),
+        Ok(Err(err)) => {
+            // panic will trigger an unreachable instruction which in turn is a regular failure
+            panic!()
+        }
         // FIXME: add support for pushing the error message as revert data
-        Err(err) => ewasm_api::revert(),
+        Err(err) => {
+            // panic will trigger an unreachable instruction which in turn is a regular failure
+            panic!()
+        }
     }
 }
