@@ -17,3 +17,7 @@ parity-bytes = { git = "https://github.com/paritytech/parity-common" }
 
 [lib]
 crate-type = ["cdylib"]
+
+[profile.release]
+lto = true
+debug = false
