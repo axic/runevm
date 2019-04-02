@@ -21,6 +21,8 @@ use self::vm::{
     TrapKind,
 };
 
+use ewasm_api::types::{Bytes20, Bytes32, Uint128};
+
 // For some explanation see ethcore/vm/src/tests.rs::FakeExt
 
 #[derive(Default)]
@@ -38,17 +40,14 @@ impl vm::Ext for EwasmExt {
 
     /// Returns a value for given key.
     fn storage_at(&self, key: &H256) -> Result<H256> {
+        let ret = ewasm_api::storage_load(&Bytes32 { bytes: key.0 });
         // FIXME: why isn't there a From trait for converting between [u8;32] and H256?
-        let key = key.0;
-        let ret = ewasm_api::storage_load(&key);
-        Ok(H256::from(ret))
+        Ok(H256::from(ret.bytes))
     }
 
     /// Stores a value for given key.
     fn set_storage(&mut self, key: H256, value: H256) -> Result<()> {
-        let key = key.0;
-        let value = value.0;
-        ewasm_api::storage_store(&key, &value);
+        ewasm_api::storage_store(&Bytes32 { bytes: key.0 }, &Bytes32 { bytes: value.0 });
         Ok(())
     }
 
@@ -70,16 +69,16 @@ impl vm::Ext for EwasmExt {
     fn origin_balance(&self) -> Result<U256> {
         // NOTE: used by SLEFDESTRUCT for gas metering (not used here now since we don't charge gas)
         let origin = ewasm_api::tx_origin();
-        Ok(U256::from(U128::from(ewasm_api::external_balance(&origin))))
+        Ok(U256::from(U128::from(
+            ewasm_api::external_balance(&origin).bytes,
+        )))
     }
 
     /// Returns address balance.
     fn balance(&self, address: &Address) -> Result<U256> {
-        // FIXME: this type should just implement the From trait for the underlying type
-        let address: [u8; 20] = address.0;
-        Ok(U256::from(U128::from(ewasm_api::external_balance(
-            &address,
-        ))))
+        Ok(U256::from(U128::from(
+            ewasm_api::external_balance(&Bytes20 { bytes: address.0 }).bytes,
+        )))
     }
 
     /// Returns the hash of one of the 256 most recent complete blocks.
@@ -127,24 +126,41 @@ impl vm::Ext for EwasmExt {
         // FIXME: might not be good enough
         let gas_start = ewasm_api::gas_left();
 
-        // FIXME: this type should just implement the From trait for the underlying type
-        let receive_address: [u8; 20] = receive_address.0;
-
         let call_result = match call_type {
             CallType::Call => ewasm_api::call_mutable(
                 gas_limit,
-                &receive_address,
-                &U128::from(value.unwrap_or_default()).into(),
+                &Bytes20 {
+                    bytes: receive_address.0,
+                },
+                &Uint128 {
+                    bytes: U128::from(value.unwrap_or_default()).into(),
+                },
                 &data,
             ),
             CallType::CallCode => ewasm_api::call_code(
                 gas_limit,
-                &receive_address,
-                &U128::from(value.unwrap_or_default()).into(),
+                &Bytes20 {
+                    bytes: receive_address.0,
+                },
+                &Uint128 {
+                    bytes: U128::from(value.unwrap_or_default()).into(),
+                },
                 &data,
             ),
-            CallType::DelegateCall => ewasm_api::call_delegate(gas_limit, &receive_address, &data),
-            CallType::StaticCall => ewasm_api::call_static(gas_limit, &receive_address, &data),
+            CallType::DelegateCall => ewasm_api::call_delegate(
+                gas_limit,
+                &Bytes20 {
+                    bytes: receive_address.0,
+                },
+                &data,
+            ),
+            CallType::StaticCall => ewasm_api::call_static(
+                gas_limit,
+                &Bytes20 {
+                    bytes: receive_address.0,
+                },
+                &data,
+            ),
             _ => panic!(),
         };
 
@@ -173,6 +189,7 @@ impl vm::Ext for EwasmExt {
                     ReturnData::new(ret, 0, ret_len),
                 ))
             }
+            ewasm_api::CallResult::Unknown => panic!(),
         }
 
         // FIXME: no way to know if it ran out of gas? Handle it properly.
@@ -284,12 +301,12 @@ pub extern "C" fn main() {
 
     // FIXME: do we need to set this?
     // params.call_type = if code.is_none() { CallType::Call } else { CallType::None };
-    params.code_address = Address::from(ewasm_api::current_address());
+    params.code_address = Address::from(ewasm_api::current_address().bytes);
     params.code = Some(Arc::new(ewasm_api::code_acquire()));
     params.address = params.code_address;
-    params.sender = Address::from(ewasm_api::caller());
-    params.origin = Address::from(ewasm_api::tx_origin());
-    params.gas_price = U256::from(U128::from(ewasm_api::tx_gas_price()));
+    params.sender = Address::from(ewasm_api::caller().bytes);
+    params.origin = Address::from(ewasm_api::tx_origin().bytes);
+    params.gas_price = U256::from(U128::from(ewasm_api::tx_gas_price().bytes));
     // NOTE: there is no tx_gas_limit in the EEI
     params.gas = U256::from(startgas);
     params.data = Some(ewasm_api::calldata_acquire());
@@ -301,8 +318,8 @@ pub extern "C" fn main() {
 
     // Set block environment information
     // TODO: do this via lazy loading
-    ext.info.author = Address::from(ewasm_api::block_coinbase());
-    ext.info.difficulty = U256::from(ewasm_api::block_difficulty());
+    ext.info.author = Address::from(ewasm_api::block_coinbase().bytes);
+    ext.info.difficulty = U256::from(ewasm_api::block_difficulty().bytes);
     ext.info.number = ewasm_api::block_number();
     ext.info.timestamp = ewasm_api::block_timestamp();
     ext.info.gas_limit = U256::from(ewasm_api::block_gas_limit());
@@ -316,7 +333,7 @@ pub extern "C" fn main() {
             ewasm_api::consume_gas(startgas - gas_left.as_u64());
             if ext.selfdestruct_address.is_some() {
                 let beneficiary: [u8; 20] = ext.selfdestruct_address.unwrap().into();
-                ewasm_api::selfdestruct(&beneficiary)
+                ewasm_api::selfdestruct(&ewasm_api::types::Bytes20 { bytes: beneficiary })
             } else {
                 ewasm_api::finish()
             }
