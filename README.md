@@ -24,17 +24,20 @@ To achieve this, it consists of two parts:
 
 The deployer is a tiny wasm wrapper, which only returns the interpreter.
 
-To make compilation easier, the deployer is hand written in WAT (WebAssembly Text) and
-expects a 32-bit little endian number at the end of the code containing the bytecode size
-of the interpreter. It will *codecopy* itself to memory and return the memory section
-corresponding to the interpreter.
-
 ### Building
 
-Just run `build.sh`. The resulting binary will be at `target/runevm.wasm`.
+Run:
+```shell
+$ cargo build --release
+$ chisel run
+```
 
-It expects `wasmg-gc` and `wast2wasm` from [wabt](https://github.com/webassembly/wabt)
-is installed and available in the path.
+The resulting binary will be at `target/runevm.wasm`.
+
+It expects [chisel](https://github.com/wasmx/wasm-chisel) is installed:
+```shell
+$ cargo install chisel
+```
 
 ## Author(s)
 

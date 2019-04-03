@@ -20,15 +20,18 @@ jobs:
             rustup component add rustfmt-preview
             rustup update
       - run:
-           name: Check formatting
-           command: |
-             rustfmt --version
-             cargo fmt
-             git diff --exit-code
+          name: Check formatting
+          command: |
+            rustfmt --version
+            cargo fmt --all -- --check
       - run:
           name: Install dependencies
           command: |
-            cargo install wasm-gc
+            cargo install chisel
       - run:
           name: Build
-          command: cargo build --release --target wasm32-unknown-unknown
+          command: |
+            cargo build --release --target wasm32-unknown-unknown
+            chisel run
+            ls -l target/runevm.wasm
+            test -f target/runevm.wasm
