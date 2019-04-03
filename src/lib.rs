@@ -161,7 +161,7 @@ impl vm::Ext for EwasmExt {
                 },
                 &data,
             ),
-            _ => panic!(),
+            _ => ewasm_api::abort(),
         };
 
         // FIXME: might not be good enough
@@ -189,7 +189,7 @@ impl vm::Ext for EwasmExt {
                     ReturnData::new(ret, 0, ret_len),
                 ))
             }
-            ewasm_api::CallResult::Unknown => panic!(),
+            ewasm_api::CallResult::Unknown => ewasm_api::abort(),
         }
 
         // FIXME: no way to know if it ran out of gas? Handle it properly.
@@ -351,14 +351,8 @@ pub extern "C" fn main() {
             }
         }
         // FIXME: not sure what this state means
-        Ok(Err(err)) => {
-            // panic will trigger an unreachable instruction which in turn is a regular failure
-            panic!()
-        }
+        Ok(Err(err)) => ewasm_api::abort(),
         // FIXME: add support for pushing the error message as revert data
-        Err(err) => {
-            // panic will trigger an unreachable instruction which in turn is a regular failure
-            panic!()
-        }
+        Err(err) => ewasm_api::abort(),
     }
 }
