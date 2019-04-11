@@ -197,8 +197,9 @@ impl vm::Ext for EwasmExt {
 
     /// Returns code at given address
     fn extcode(&self, address: &Address) -> Result<Option<Arc<Bytes>>> {
-        // FIXME: implement
-        unimplemented!()
+        Ok(Some(Arc::new(ewasm_api::external_code_acquire(&Bytes20 {
+            bytes: address.0,
+        }))))
     }
 
     /// Returns code hash at given address
@@ -210,8 +211,9 @@ impl vm::Ext for EwasmExt {
 
     /// Returns code size at given address
     fn extcodesize(&self, address: &Address) -> Result<Option<usize>> {
-        // FIXME: implement
-        unimplemented!()
+        Ok(Some(ewasm_api::external_code_size(&Bytes20 {
+            bytes: address.0,
+        })))
     }
 
     /// Creates log entry with given topics and data
