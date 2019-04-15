@@ -23,6 +23,19 @@ use self::vm::{
 
 use ewasm_api::types::{Bytes20, Bytes32, Uint128};
 
+trait AsCheckedU64 {
+    fn as_checked_u64(&self) -> u64;
+}
+
+impl AsCheckedU64 for U256 {
+    fn as_checked_u64(&self) -> u64 {
+        if self > &U256::from("ffffffffffffffff") {
+            ewasm_api::abort();
+        }
+        self.as_u64()
+    }
+}
+
 // For some explanation see ethcore/vm/src/tests.rs::FakeExt
 
 #[derive(Default)]
@@ -119,9 +132,7 @@ impl vm::Ext for EwasmExt {
         call_type: CallType,
         trap: bool,
     ) -> ::std::result::Result<MessageCallResult, TrapKind> {
-        // FIXME: set this properly
-        //let gas_limit = u64::from(gas);
-        let gas_limit = gas.as_u64();
+        let gas_limit = gas.as_checked_u64();
 
         // FIXME: might not be good enough
         let gas_start = ewasm_api::gas_left();
@@ -332,7 +343,7 @@ pub extern "C" fn main() {
     // Could run `result.finalize(ext)` here, but processing manually seemed simpler.
     match result {
         Ok(Ok(GasLeft::Known(gas_left))) => {
-            ewasm_api::consume_gas(startgas - gas_left.as_u64());
+            ewasm_api::consume_gas(startgas - gas_left.as_checked_u64());
             if ext.selfdestruct_address.is_some() {
                 let beneficiary: [u8; 20] = ext.selfdestruct_address.unwrap().into();
                 ewasm_api::selfdestruct(&ewasm_api::types::Bytes20 { bytes: beneficiary })
@@ -345,7 +356,7 @@ pub extern "C" fn main() {
             data,
             apply_state,
         })) => {
-            ewasm_api::consume_gas(startgas - gas_left.as_u64());
+            ewasm_api::consume_gas(startgas - gas_left.as_checked_u64());
             if apply_state {
                 ewasm_api::finish_data(&data.deref())
             } else {
