@@ -82,15 +82,15 @@ impl vm::Ext for EwasmExt {
     fn origin_balance(&self) -> Result<U256> {
         // NOTE: used by SLEFDESTRUCT for gas metering (not used here now since we don't charge gas)
         let origin = ewasm_api::tx_origin();
-        Ok(U256::from(U128::from(
-            ewasm_api::external_balance(&origin).bytes,
+        Ok(U256::from(U128::from_little_endian(
+            &ewasm_api::external_balance(&origin).bytes,
         )))
     }
 
     /// Returns address balance.
     fn balance(&self, address: &Address) -> Result<U256> {
-        Ok(U256::from(U128::from(
-            ewasm_api::external_balance(&Bytes20 { bytes: address.0 }).bytes,
+        Ok(U256::from(U128::from_little_endian(
+            &ewasm_api::external_balance(&Bytes20 { bytes: address.0 }).bytes,
         )))
     }
 
@@ -319,7 +319,7 @@ pub extern "C" fn main() {
     params.address = params.code_address;
     params.sender = Address::from(ewasm_api::caller().bytes);
     params.origin = Address::from(ewasm_api::tx_origin().bytes);
-    params.gas_price = U256::from(U128::from(ewasm_api::tx_gas_price().bytes));
+    params.gas_price = U256::from(U128::from_little_endian(&ewasm_api::tx_gas_price().bytes));
     // NOTE: there is no tx_gas_limit in the EEI
     params.gas = U256::from(startgas);
     params.data = Some(ewasm_api::calldata_acquire());
@@ -332,7 +332,7 @@ pub extern "C" fn main() {
     // Set block environment information
     // TODO: do this via lazy loading
     ext.info.author = Address::from(ewasm_api::block_coinbase().bytes);
-    ext.info.difficulty = U256::from(ewasm_api::block_difficulty().bytes);
+    ext.info.difficulty = U256::from_little_endian(&ewasm_api::block_difficulty().bytes);
     ext.info.number = ewasm_api::block_number();
     ext.info.timestamp = ewasm_api::block_timestamp();
     ext.info.gas_limit = U256::from(ewasm_api::block_gas_limit());
