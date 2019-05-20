@@ -4,6 +4,7 @@ jobs:
   build:
     docker:
       - image: rust:1
+    working_directory: ~/package
     steps:
       - checkout
       - run:
@@ -35,3 +36,47 @@ jobs:
             chisel run
             ls -l target/runevm.wasm
             test -f target/runevm.wasm
+  test:
+    docker:
+      - image: ethereum/cpp-build-env:11
+    working_directory: ~/package
+    steps:
+      - checkout
+      - run:
+          name: Install aleth
+          command: |
+            VER=1.6.0
+            OS=$(uname | tr '[:upper:]' '[:lower:]')
+            URL=https://github.com/ethereum/aleth/releases/download/v$VER/aleth-$VER-$OS-x86_64.tar.gz
+            echo $URL
+            curl -L $URL | sudo tar xz -C /usr/local
+      - run:
+          name: Install hera
+          command: |
+            VER=0.2.4
+            OS=$(uname | tr '[:upper:]' '[:lower:]')
+            URL=https://github.com/ewasm/hera/releases/download/v$VER/hera-$VER-$OS-x86_64.tar.gz
+            echo $URL
+            curl -L $URL | sudo tar xz -C /usr/local
+            test -f /usr/local/lib/libhera.so
+      - run:
+          name: Fetch tests
+          command: git clone https://github.com/ethereum/tests -b develop --single-branch --depth 1
+      - run:
+          name: Run state tests
+          command: |
+            testeth --version
+            testeth -t GeneralStateTests/stExample -- --testpath tests --singlenet Byzantium --vm /usr/local/lib/libhera.so --evmc evm1mode=runevm --evmc sys:runevm=target/runevm.wasm --statediff
+            # This works, but takes too much time (4 minutes)
+            # testeth -t GeneralStateTests/stStackTests -- --testpath tests --singlenet Byzantium --vm /usr/local/lib/libhera.so --evmc evm1mode=runevm --evmc sys:runevm=target/runevm.wasm --statediff
+            testeth -t GeneralStateTests/stShift -- --testpath tests --singlenet Byzantium --vm /usr/local/lib/libhera.so --evmc evm1mode=runevm --evmc sys:runevm=target/runevm.wasm --statediff
+            testeth -t GeneralStateTests/stCodeSizeLimit -- --testpath tests --singlenet Byzantium --vm /usr/local/lib/libhera.so --evmc evm1mode=runevm --evmc sys:runevm=target/runevm.wasm --statediff
+
+workflows:
+  version: 2
+  build-test:
+    jobs:
+      - build
+      - test:
+          requires:
+            - build
