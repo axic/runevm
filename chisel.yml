@@ -5,5 +5,9 @@ runevm:
     preset: "ewasm"
   trimexports:
     preset: "ewasm"
+  verifyexports:
+    preset: "ewasm"
+  verifyimports:
+    preset: "ewasm"
   deployer:
     preset: "customsection"
