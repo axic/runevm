@@ -8,7 +8,7 @@ description = "EVM interpreter compatible with the evm2wasm interface"
 publish = false
 
 [dependencies]
-ewasm_api = "0.8"
+ewasm_api = "0.9"
 evm = { path = "parity-ethereum/ethcore/evm" }
 vm = { path = "parity-ethereum/ethcore/vm" }
 ethereum-types = "0.4"
