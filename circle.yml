@@ -68,7 +68,9 @@ jobs:
             test -f /usr/local/lib/libhera.so
       - run:
           name: Fetch tests
-          command: git clone https://github.com/ethereum/tests -b develop --single-branch --depth 1
+          command: |
+            # Using the ewasm fork because the main one has some issues with Byzantium-only execution
+            git clone https://github.com/ewasm/tests -b wasm-tests --single-branch --depth 1
       - run:
           name: Run state tests
           command: |
