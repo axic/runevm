@@ -45,6 +45,10 @@ struct EwasmExt {
     pub selfdestruct_address: Option<Address>,
 }
 
+extern "C" {
+    fn debug_evmTrace(pc: u32, opcode: u32, cost: u32, sp: u32);
+}
+
 impl vm::Ext for EwasmExt {
     /// Returns the storage value for a given key if reversion happens on the current transaction.
     fn initial_storage_at(&self, key: &H256) -> Result<H256> {
@@ -280,11 +284,14 @@ impl vm::Ext for EwasmExt {
 
     /// Decide if any more operations should be traced. Passthrough for the VM trace.
     fn trace_next_instruction(&mut self, _pc: usize, _instruction: u8, _current_gas: U256) -> bool {
-        false
+        true
     }
 
     /// Prepare to trace an operation. Passthrough for the VM trace.
-    fn trace_prepare_execute(
+    fn trace_prepare_execute(&mut self, _pc: usize, _instruction: u8, _gas_cost: U256) {}
+
+    /// Trace the finalised execution of a single instruction.
+    fn trace_executed(
         &mut self,
         _pc: usize,
         _instruction: u8,
@@ -292,6 +299,7 @@ impl vm::Ext for EwasmExt {
         _mem_written: Option<(usize, usize)>,
         _store_written: Option<(U256, U256)>,
     ) {
+        // unsafe { debug_evmTtrace(_pc as u32, _instruction as u32, 0 as u32, 0 as u32) }
     }
 
     /// Trace the finalised execution of a single instruction.
@@ -303,6 +311,29 @@ impl vm::Ext for EwasmExt {
         false
     }
 }
+
+/*
+impl fmt::Display for Error {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                use self::Error::*;
+                match *self {
+                        OutOfGas => write!(f, "Out of gas"),
+                        BadJumpDestination { destination } => write!(f, "Bad jump destination {:x}", destination),
+                        BadInstruction { instruction } => write!(f, "Bad instruction {:x}",  instruction),
+                        StackUnderflow { instruction, wanted, on_stack } => write!(f, "Stack underflow {} {}/{}", instruction, wanted, on_stack),
+                        OutOfStack { instruction, wanted, limit } => write!(f, "Out of stack {} {}/{}", instruction, wanted, limit),
+                        BuiltIn(name) => write!(f, "Built-in failed: {}", name),
+                        Internal(ref msg) => write!(f, "Internal error: {}", msg),
+                        MutableCallInStaticContext => write!(f, "Mutable call in static context"),
+                        Wasm(ref msg) => write!(f, "Internal error: {}", msg),
+                        OutOfBounds => write!(f, "Out of bounds"),
+                        Reverted => write!(f, "Reverted"),
+                }
+        }
+}
+*/
+
+use std::fmt;
 
 #[no_mangle]
 pub extern "C" fn main() {
@@ -364,7 +395,13 @@ pub extern "C" fn main() {
             }
         }
         // FIXME: not sure what this state means
-        Ok(Err(err)) => ewasm_api::abort(),
+        Ok(Err(err)) => {
+            // let mut msg = String::new();
+            // fmt::write(&mut msg, format_args!("{}", err)).expect("??");
+            // let out: Vec<u8> = msg.into();
+            // ewasm_api::debug::printMem(&out);
+            ewasm_api::abort()
+        }
         // FIXME: add support for pushing the error message as revert data
         Err(err) => ewasm_api::abort(),
     }
