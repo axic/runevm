@@ -53,14 +53,13 @@ impl vm::Ext for EwasmExt {
 
     /// Returns a value for given key.
     fn storage_at(&self, key: &H256) -> Result<H256> {
-        let ret = ewasm_api::storage_load(&Bytes32 { bytes: key.0 });
-        // FIXME: why isn't there a From trait for converting between [u8;32] and H256?
-        Ok(H256::from(ret.bytes))
+        let ret: [u8; 32] = ewasm_api::storage_load(&Bytes32::from(key.0)).into();
+        Ok(H256::from(ret))
     }
 
     /// Stores a value for given key.
     fn set_storage(&mut self, key: H256, value: H256) -> Result<()> {
-        ewasm_api::storage_store(&Bytes32 { bytes: key.0 }, &Bytes32 { bytes: value.0 });
+        ewasm_api::storage_store(&Bytes32::from(key.0), &Bytes32::from(value.0));
         Ok(())
     }
 
@@ -82,16 +81,14 @@ impl vm::Ext for EwasmExt {
     fn origin_balance(&self) -> Result<U256> {
         // NOTE: used by SLEFDESTRUCT for gas metering (not used here now since we don't charge gas)
         let origin = ewasm_api::tx_origin();
-        Ok(U256::from(U128::from_little_endian(
-            &ewasm_api::external_balance(&origin).bytes,
-        )))
+        let balance: [u8; 16] = ewasm_api::external_balance(&origin).into();
+        Ok(U256::from(U128::from_little_endian(&balance)))
     }
 
     /// Returns address balance.
     fn balance(&self, address: &Address) -> Result<U256> {
-        Ok(U256::from(U128::from_little_endian(
-            &ewasm_api::external_balance(&Bytes20 { bytes: address.0 }).bytes,
-        )))
+        let balance: [u8; 16] = ewasm_api::external_balance(&Bytes20::from(address.0)).into();
+        Ok(U256::from(U128::from_little_endian(&balance)))
     }
 
     /// Returns the hash of one of the 256 most recent complete blocks.
@@ -137,41 +134,27 @@ impl vm::Ext for EwasmExt {
         // FIXME: might not be good enough
         let gas_start = ewasm_api::gas_left();
 
+        let value: [u8; 16] = U128::from(value.unwrap_or_default()).into();
+
         let call_result = match call_type {
             CallType::Call => ewasm_api::call_mutable(
                 gas_limit,
-                &Bytes20 {
-                    bytes: receive_address.0,
-                },
-                &Uint128 {
-                    bytes: U128::from(value.unwrap_or_default()).into(),
-                },
+                &Bytes20::from(receive_address.0),
+                &Uint128::from(value),
                 &data,
             ),
             CallType::CallCode => ewasm_api::call_code(
                 gas_limit,
-                &Bytes20 {
-                    bytes: receive_address.0,
-                },
-                &Uint128 {
-                    bytes: U128::from(value.unwrap_or_default()).into(),
-                },
+                &Bytes20::from(receive_address.0),
+                &Uint128::from(value),
                 &data,
             ),
-            CallType::DelegateCall => ewasm_api::call_delegate(
-                gas_limit,
-                &Bytes20 {
-                    bytes: receive_address.0,
-                },
-                &data,
-            ),
-            CallType::StaticCall => ewasm_api::call_static(
-                gas_limit,
-                &Bytes20 {
-                    bytes: receive_address.0,
-                },
-                &data,
-            ),
+            CallType::DelegateCall => {
+                ewasm_api::call_delegate(gas_limit, &Bytes20::from(receive_address.0), &data)
+            }
+            CallType::StaticCall => {
+                ewasm_api::call_static(gas_limit, &Bytes20::from(receive_address.0), &data)
+            }
             _ => ewasm_api::abort(),
         };
 
@@ -208,9 +191,9 @@ impl vm::Ext for EwasmExt {
 
     /// Returns code at given address
     fn extcode(&self, address: &Address) -> Result<Option<Arc<Bytes>>> {
-        Ok(Some(Arc::new(ewasm_api::external_code_acquire(&Bytes20 {
-            bytes: address.0,
-        }))))
+        Ok(Some(Arc::new(ewasm_api::external_code_acquire(
+            &Bytes20::from(address.0),
+        ))))
     }
 
     /// Returns code hash at given address
@@ -222,9 +205,9 @@ impl vm::Ext for EwasmExt {
 
     /// Returns code size at given address
     fn extcodesize(&self, address: &Address) -> Result<Option<usize>> {
-        Ok(Some(ewasm_api::external_code_size(&Bytes20 {
-            bytes: address.0,
-        })))
+        Ok(Some(ewasm_api::external_code_size(&Bytes20::from(
+            address.0,
+        ))))
     }
 
     /// Creates log entry with given topics and data
@@ -312,14 +295,19 @@ pub extern "C" fn main() {
 
     let mut params = ActionParams::default();
 
+    let current_address: [u8; 20] = ewasm_api::current_address().into();
+    let caller: [u8; 20] = ewasm_api::caller().into();
+    let tx_origin: [u8; 20] = ewasm_api::tx_origin().into();
+    let tx_gas_price: [u8; 16] = ewasm_api::tx_gas_price().into();
+
     // FIXME: do we need to set this?
     // params.call_type = if code.is_none() { CallType::Call } else { CallType::None };
-    params.code_address = Address::from(ewasm_api::current_address().bytes);
+    params.code_address = Address::from(current_address);
     params.code = Some(Arc::new(ewasm_api::code_acquire()));
     params.address = params.code_address;
-    params.sender = Address::from(ewasm_api::caller().bytes);
-    params.origin = Address::from(ewasm_api::tx_origin().bytes);
-    params.gas_price = U256::from(U128::from_little_endian(&ewasm_api::tx_gas_price().bytes));
+    params.sender = Address::from(caller);
+    params.origin = Address::from(tx_origin);
+    params.gas_price = U256::from(U128::from_little_endian(&tx_gas_price));
     // NOTE: there is no tx_gas_limit in the EEI
     params.gas = U256::from(startgas);
     params.data = Some(ewasm_api::calldata_acquire());
@@ -329,10 +317,13 @@ pub extern "C" fn main() {
     // TODO: should create a proper implementation for default() on EwasmExt which does this
     ext.schedule = Schedule::new_byzantium();
 
+    let block_coinbase: [u8; 20] = ewasm_api::block_coinbase().into();
+    let block_difficulty: [u8; 32] = ewasm_api::block_difficulty().into();
+
     // Set block environment information
     // TODO: do this via lazy loading
-    ext.info.author = Address::from(ewasm_api::block_coinbase().bytes);
-    ext.info.difficulty = U256::from_little_endian(&ewasm_api::block_difficulty().bytes);
+    ext.info.author = Address::from(block_coinbase);
+    ext.info.difficulty = U256::from_little_endian(&block_difficulty);
     ext.info.number = ewasm_api::block_number();
     ext.info.timestamp = ewasm_api::block_timestamp();
     ext.info.gas_limit = U256::from(ewasm_api::block_gas_limit());
@@ -346,7 +337,7 @@ pub extern "C" fn main() {
             ewasm_api::consume_gas(startgas - gas_left.as_checked_u64());
             if ext.selfdestruct_address.is_some() {
                 let beneficiary: [u8; 20] = ext.selfdestruct_address.unwrap().into();
-                ewasm_api::selfdestruct(&ewasm_api::types::Bytes20 { bytes: beneficiary })
+                ewasm_api::selfdestruct(&ewasm_api::types::Bytes20::from(beneficiary))
             } else {
                 ewasm_api::finish()
             }
