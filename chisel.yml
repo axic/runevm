@@ -12,4 +12,4 @@ runevm:
   repack:
     preset: "ewasm"
   deployer:
-    preset: "customsection"
+    preset: "memory"
