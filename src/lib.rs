@@ -1,24 +1,9 @@
-extern crate ethereum_types;
-extern crate evm;
 extern crate ewasm_api;
-extern crate parity_bytes as bytes;
-extern crate vm;
+
+use standalone_parity_evm::*;
 
 use std::ops::Deref;
 use std::sync::Arc;
-
-use self::ethereum_types::{Address, H160, H256, U128, U256};
-
-use self::bytes::Bytes;
-
-use self::evm::Ext;
-use self::evm::Factory;
-
-use self::vm::{
-    ActionParams, ActionValue, CallType, CleanDustMode, ContractCreateResult,
-    CreateContractAddress, EnvInfo, GasLeft, MessageCallResult, Result, ReturnData, Schedule,
-    TrapKind,
-};
 
 use ewasm_api::types::{Bytes20, Bytes32, Uint128};
 
@@ -44,7 +29,7 @@ struct EwasmExt {
     pub selfdestruct_address: Option<Address>,
 }
 
-impl vm::Ext for EwasmExt {
+impl Ext for EwasmExt {
     /// Returns the storage value for a given key if reversion happens on the current transaction.
     fn initial_storage_at(&self, key: &H256) -> Result<H256> {
         unimplemented!()

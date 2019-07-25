@@ -10,10 +10,7 @@ publish = false
 
 [dependencies]
 ewasm_api = "0.10"
-evm = { path = "parity-ethereum/ethcore/evm" }
-vm = { path = "parity-ethereum/ethcore/vm" }
-ethereum-types = "0.4"
-parity-bytes = { git = "https://github.com/paritytech/parity-common" }
+standalone_parity_evm = { git = "https://github.com/axic/standalone-parity-evm", rev = "e89e30a" }
 
 [lib]
 crate-type = ["cdylib"]

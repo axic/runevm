@@ -4,7 +4,7 @@ EVM interpreter compatible with the evm2wasm interface.
 
 This is a drop in replacement for [evm2wasm](https://github.com/ewasm/evm2wasm).
 
-It uses the EVM interpreter from [parity-ethereum](https://github.com/paritytech/parity-ethereum/).
+It uses the EVM interpreter from [parity-ethereum](https://github.com/paritytech/parity-ethereum/) (through [standalone-parity-evm](https://github.com/axic/standalone-parity-evm)).
 
 ### Technical detail
 
