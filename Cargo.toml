@@ -5,6 +5,7 @@ authors = ["Alex Beregszaszi <alex@rtfs.hu>"]
 license = "Apache-2.0"
 repository = "https://github.com/axic/runevm"
 description = "EVM interpreter compatible with the evm2wasm interface"
+edition = "2018"
 publish = false
 
 [dependencies]

@@ -4,7 +4,6 @@ extern crate ewasm_api;
 extern crate parity_bytes as bytes;
 extern crate vm;
 
-use std::cmp;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -328,7 +327,7 @@ pub extern "C" fn main() {
     ext.info.timestamp = ewasm_api::block_timestamp();
     ext.info.gas_limit = U256::from(ewasm_api::block_gas_limit());
 
-    let mut instance = Factory::default().create(params, ext.schedule(), ext.depth());
+    let instance = Factory::default().create(params, ext.schedule(), ext.depth());
     let result = instance.exec(&mut ext);
 
     // Could run `result.finalize(ext)` here, but processing manually seemed simpler.
@@ -355,8 +354,8 @@ pub extern "C" fn main() {
             }
         }
         // FIXME: not sure what this state means
-        Ok(Err(err)) => ewasm_api::abort(),
+        Ok(Err(_err)) => ewasm_api::abort(),
         // FIXME: add support for pushing the error message as revert data
-        Err(err) => ewasm_api::abort(),
+        Err(_err) => ewasm_api::abort(),
     }
 }
