@@ -9,7 +9,7 @@ runevm:
     preset: "ewasm"
   verifyimports:
     preset: "ewasm"
-  repack:
+  snip:
     preset: "ewasm"
   deployer:
     preset: "memory"
