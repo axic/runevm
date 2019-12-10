@@ -1,3 +1,0 @@
-[submodule "parity-ethereum"]
-	path = parity-ethereum
-	url = https://github.com/paritytech/parity-ethereum/
