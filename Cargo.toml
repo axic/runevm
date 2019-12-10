@@ -10,7 +10,7 @@ publish = false
 
 [dependencies]
 ewasm_api = "0.10"
-standalone_parity_evm = { git = "https://github.com/axic/standalone-parity-evm", rev = "e89e30a" }
+standalone_parity_evm = { git = "https://github.com/axic/standalone-parity-evm", tag = "v2.5.11" }
 
 [lib]
 crate-type = ["cdylib"]

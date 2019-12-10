@@ -226,6 +226,11 @@ impl Ext for EwasmExt {
         &self.info
     }
 
+    /// Returns the chain ID of the blockchain
+    fn chain_id(&self) -> u64 {
+        unimplemented!()
+    }
+
     /// Returns current depth of execution.
     ///
     /// If contract A calls contract B, and contract B calls C,
